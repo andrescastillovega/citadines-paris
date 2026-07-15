@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paris family stays — Citadines + the C$380–550 competition, mapped &amp; scored</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root{
+    --ink:#222222; --sub:#717171; --line:#DDDDDD; --hair:#EBEBEB; --bg:#FFFFFF;
+    --chipbg:#F7F7F7; --brand:#FF385C; --ok:#008A05; --bad:#C13515;
+    --t1:#067647; --t2:#55A66A; --t3:#D9A036; --t4:#D95841;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);
+    font-family:Circular,"Airbnb Cereal VF",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1020px;margin:0 auto;padding:14px 14px 44px}
+
+  .topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between;
+    padding:4px 2px 14px;border-bottom:1px solid var(--hair)}
+  .logo{color:var(--brand);font-weight:800;font-size:19px;letter-spacing:-.02em;white-space:nowrap}
+  .logo span{color:var(--ink);font-weight:600}
+  .searchpill{display:flex;align-items:center;background:#fff;border:1px solid var(--line);
+    border-radius:999px;box-shadow:0 1px 2px rgba(0,0,0,.08),0 3px 10px rgba(0,0,0,.06);
+    padding:7px 7px 7px 16px;font-size:13px;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .searchpill::-webkit-scrollbar{display:none}
+  .searchpill .seg{padding:0 12px;white-space:nowrap;font-weight:600}
+  .searchpill .seg small{display:block;font-weight:400;color:var(--sub);font-size:11px}
+  .searchpill .seg + .seg{border-left:1px solid var(--hair)}
+  .searchpill .go{flex:none;width:32px;height:32px;border-radius:50%;background:var(--brand);
+    color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;margin-left:8px}
+  @media(max-width:640px){ .topbar{justify-content:center} .searchpill .seg{padding:0 9px} }
+
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 2px 4px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;
+    padding:8px 15px;font-size:13px;cursor:pointer;transition:border-color .12s,background .12s;font-family:inherit}
+  .chip:hover{border-color:#B0B0B0}
+  .chip[aria-pressed="true"]{border:1.5px solid var(--ink);background:var(--chipbg);font-weight:600}
+  .chip.clear{border:none;background:none;text-decoration:underline;font-weight:600;display:none;padding-left:6px}
+  .chip.clear.show{display:block}
+
+  .map-shell{position:relative;margin-top:10px;border-radius:16px;overflow:hidden;
+    border:1px solid var(--hair);background:#E8ECE9}
+  #map{height:min(72vh,640px);min-height:440px;width:100%;z-index:0}
+  .countpill{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:500;
+    background:#fff;border-radius:999px;box-shadow:0 1px 2px rgba(0,0,0,.18),0 4px 12px rgba(0,0,0,.12);
+    padding:8px 16px;font-size:13px;font-weight:600;white-space:nowrap;pointer-events:none}
+  .brandkey{position:absolute;left:12px;bottom:12px;z-index:500;background:rgba(255,255,255,.95);
+    border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.15),0 3px 10px rgba(0,0,0,.1);
+    padding:8px 11px;font-size:11px;line-height:1.7}
+  .brandkey .kdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  .brandkey .solid{background:#666}
+  .brandkey .ring{background:#fff;border:2.5px solid #666;box-sizing:border-box;width:10px;height:10px}
+  .map-hint{margin-top:9px;font-size:12.5px;color:var(--sub);text-align:center}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--ink);
+    font-weight:700;font-size:13px;line-height:1;padding:7px 11px;border-radius:999px;
+    box-shadow:0 1px 2px rgba(0,0,0,.18),0 2px 10px rgba(0,0,0,.14);
+    border:.5px solid rgba(0,0,0,.06);white-space:nowrap;
+    transition:transform .12s ease,background .12s ease,color .12s ease;transform-origin:center}
+  .pill .tdot{width:9px;height:9px;border-radius:50%;flex:none;box-sizing:border-box}
+  .pill:hover{transform:scale(1.08)}
+  .pill.sel{background:var(--ink);color:#fff;transform:scale(1.08)}
+  .leaflet-marker-icon{background:none;border:none}
+
+  .leaflet-popup-content-wrapper{border-radius:16px;padding:0;overflow:hidden;
+    box-shadow:0 8px 28px rgba(0,0,0,.28)}
+  .leaflet-popup-content{margin:0;width:296px !important;
+    font-family:Circular,"Airbnb Cereal VF",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  .leaflet-popup-tip{box-shadow:0 3px 10px rgba(0,0,0,.18)}
+  .leaflet-container a.leaflet-popup-close-button{top:9px;right:9px;width:26px;height:26px;
+    background:#fff;border-radius:50%;color:var(--ink);font:700 15px/26px sans-serif;
+    box-shadow:0 1px 4px rgba(0,0,0,.25);padding:0;text-align:center}
+  .card{color:var(--ink)}
+  .card-head{padding:13px 34px 11px 16px}
+  .card-head .brand{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--sub)}
+  .card-head h3{font-size:15.5px;font-weight:600;line-height:1.25;margin-top:2px}
+  .card-head .rate{margin-top:3px;font-size:12.5px}
+  .card-head .rate b{font-weight:600}
+  .card-head .rate .srcs{color:var(--sub)}
+  .card-head .loc{margin-top:2px;font-size:12.5px;color:var(--sub)}
+  .badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .badge{font-size:11px;font-weight:600;border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:#fff}
+  .badge.warn{border-color:#F0CFC5;background:#FFF8F6;color:var(--bad)}
+  .price-row{padding:0 16px 11px;font-size:15px}
+  .price-row b{font-weight:700}
+  .price-row span{color:var(--sub);font-size:13px}
+  .price-row small{display:block;color:var(--sub);font-size:11.5px;margin-top:2px}
+  .flag{margin:0 16px 11px;font-size:11.5px;line-height:1.45;background:#FFF8F6;
+    border:1px solid #F0CFC5;color:#8A2A12;border-radius:8px;padding:8px 10px}
+  .card-body{max-height:308px;overflow-y:auto;border-top:1px solid var(--hair)}
+  .sec{padding:11px 16px;border-bottom:1px solid var(--hair)}
+  .sec:last-child{border-bottom:none}
+  .sec .sec-t{font-size:12px;font-weight:600;margin-bottom:7px}
+  .meter{display:grid;grid-template-columns:66px 1fr 26px;align-items:center;gap:8px;font-size:11.5px;margin-bottom:5px}
+  .meter:last-child{margin-bottom:0}
+  .meter .lab{color:var(--sub)}
+  .meter .bar{height:5px;border-radius:4px;background:var(--hair);overflow:hidden}
+  .meter .bar i{display:block;height:100%;border-radius:4px;background:var(--ink)}
+  .meter b{text-align:right;font-weight:600}
+  .facts{display:grid;gap:7px;font-size:12px;line-height:1.5;color:#484848}
+  .facts .f{display:grid;grid-template-columns:18px 1fr;gap:7px}
+  .facts .f span:first-child{text-align:center}
+  .pc ul{list-style:none;display:grid;gap:4px;font-size:12px;line-height:1.45;color:#484848}
+  .pc li{display:grid;grid-template-columns:15px 1fr;gap:6px}
+  .pc li.p span:first-child{color:var(--ok);font-weight:700}
+  .pc li.c span:first-child{color:var(--bad);font-weight:700}
+  .src{font-size:10.5px;color:var(--sub);line-height:1.5}
+  .card-foot{border-top:1px solid var(--hair);padding:11px 16px;background:#fff}
+  .card-foot a{color:var(--ink);font-weight:600;font-size:13px;text-decoration:underline}
+
+  .notes{margin-top:30px}
+  .notes h2{font-size:22px;font-weight:600;letter-spacing:-.01em}
+  .notes .lede{margin-top:6px;font-size:14.5px;color:var(--sub);line-height:1.55}
+  .weights{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 6px}
+  .wchip{border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:12.5px;
+    display:flex;align-items:center;gap:7px;background:#fff}
+  .wchip b{font-weight:700}
+  .attr{margin-top:8px}
+  .attr .a{padding:15px 0;border-bottom:1px solid var(--hair)}
+  .attr .a:last-child{border-bottom:none}
+  .attr .a h3{font-size:14px;font-weight:600;margin-bottom:4px}
+  .attr .a p{font-size:13.5px;line-height:1.6;color:var(--sub)}
+  .caveat{margin-top:14px;font-size:12.5px;line-height:1.65;color:var(--sub)}
+  .caveat strong{color:var(--ink)}
+  footer{margin-top:24px;font-size:11px;color:var(--sub);text-align:center;line-height:1.6}
+  @media (prefers-reduced-motion: reduce){ .pill{transition:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar" role="banner">
+    <div class="logo">paris <span>· family stays</span></div>
+    <div class="searchpill" aria-label="Trip: Paris, September 2026, 2 adults and 1 toddler, budget C$380–550 per night">
+      <div class="seg">Paris<small>18 stays mapped</small></div>
+      <div class="seg">Sep 2026<small>any week</small></div>
+      <div class="seg">2 adults · 1 toddler<small>age 2 · cot needed</small></div>
+      <div class="seg">C$380–550<small>target / night</small></div>
+      <div class="go" aria-hidden="true">⌕</div>
+    </div>
+  </header>
+
+  <div class="chips" role="group" aria-label="Filters">
+    <button class="chip" id="f-ac" aria-pressed="false">❄ Air conditioning</button>
+    <button class="chip" id="f-quiet" aria-pressed="false">🌙 Quiet for naps</button>
+    <button class="chip" id="f-band" aria-pressed="false">C$380–550 / night</button>
+    <button class="chip" id="f-top" aria-pressed="false">★ 4.0 and up</button>
+    <button class="chip" id="f-cit" aria-pressed="false">Citadines only</button>
+    <button class="chip clear" id="f-clear">Clear all</button>
+  </div>
+
+  <div class="map-shell">
+    <div id="map" aria-label="Map of 18 family-suitable stays in Paris: 12 Citadines aparthotels and 6 alternatives in the C$380–550 band"></div>
+    <div class="countpill" id="countpill">18 of 18 stays</div>
+    <div class="brandkey" aria-hidden="true">
+      <div><span class="kdot solid"></span>Citadines</div>
+      <div><span class="kdot ring"></span>Other stays</div>
+    </div>
+  </div>
+  <p class="map-hint">Pins show the family score / 5 — tap one for the full card: CAD price with cot, nap &amp; stroller notes, safety, transit, pros &amp; cons, Google Maps link.</p>
+
+  <section class="notes" aria-label="How the family score and prices work">
+    <h2>Scores, prices &amp; what's on this map</h2>
+    <p class="lede">The 12 Citadines aparthotels, plus the six strongest-reviewed family-suitable hotels and aparthotels across the same neighbourhoods whose typical September rates sit in the <strong>C$380–550 / night</strong> band. Paris has hundreds of hotels in that range — this is a curated shortlist chosen for toddler fit and review quality, not a census. All scored on the same seven attributes for two adults + a 2-year-old.</p>
+
+    <div class="weights">
+      <span class="wchip">Guest reviews <b>20%</b></span>
+      <span class="wchip">Family &amp; baby fit <b>20%</b></span>
+      <span class="wchip">Location <b>15%</b></span>
+      <span class="wchip">Transit access <b>15%</b></span>
+      <span class="wchip">Neighborhood safety <b>15%</b></span>
+      <span class="wchip">Facilities status <b>10%</b></span>
+      <span class="wchip">Value for money <b>5%</b></span>
+    </div>
+
+    <div class="attr">
+      <div class="a"><h3>Prices — now in Canadian dollars</h3><p>Converted at <strong>€1 = C$1.61</strong>, the mid-market rate on July 15, 2026 (quotes ranged 1.606–1.616). Figures are approximate nightly averages for the base family unit — a <strong>studio or double + baby cot</strong>, 2 adults + toddler — from rates listed on booking platforms in July 2026, rounded to the nearest C$10; each card also shows the euro range and a rough upgrade rate. Cots are on request and limited — confirm when booking; Paris tourist tax doesn't apply to children. Late-September fashion week pushes everything toward (or past) the top of its range.</p></div>
+      <div class="a"><h3>Family &amp; baby fit</h3><p>Air-conditioning for early-September nights (three of the eighteen lack it), room for a cot, kitchen and laundry access, how nap-quiet the rooms are, playgrounds or pools within reach, and stroller practicality — Paris métro stations are mostly stairs, so flat walkable areas and bus routes count.</p></div>
+      <div class="a"><h3>Guest reviews</h3><p>Current Booking.com, Tripadvisor, Trip.com and Expedia ratings, weighted toward 2025–26 stays and normalised to 0–5. Exact source figures are inside each card.</p></div>
+      <div class="a"><h3>Location &amp; transit</h3><p>Walkability to the headline sights and charm of the immediate streets; métro lines within a short walk plus direct airport and main-line links — a big deal on arrival day with a stroller, a cot bag and luggage.</p></div>
+      <div class="a"><h3>Neighborhood safety</h3><p>Day and night comfort of each district plus recurring guest remarks — pickpocket zones near Châtelet and Place d'Italie, the Pigalle strip after dark, station-square grit at Gare de Lyon. All eighteen are in normal, visitable areas; this grades comfort, not danger.</p></div>
+      <div class="a"><h3>Facilities status &amp; value</h3><p>Renovation date and current condition plus what's on site — A/C, kitchens, pools, laundry, lifts, gardens, parking. Three properties carry 2026 renovation flags; see their cards. Value grades what the September rate buys relative to the other seventeen.</p></div>
+    </div>
+
+    <p class="caveat"><strong>Sources &amp; method:</strong> compiled July 2026 from Booking.com, Tripadvisor, Trip.com, Expedia/Hotels.com, Kayak/HotelsCombined, Accor and official Citadines (Ascott) pages; scores and safety/family grades are this report's own synthesis — the seven sub-scores in each card let you re-weigh them. Want another specific hotel added to the map? It can be scored on the same scale.</p>
+  </section>
+
+  <footer>Independent comparison — not affiliated with any hotel group or Airbnb. Map data © OpenStreetMap contributors, tiles © CARTO. FX: mid-market, July 15, 2026.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+var HOTELS = [
+ /* ---------- CITADINES (12) ---------- */
+ {n:"Citadines Les Halles Paris", type:"Citadines Apart'hotel · Ascott", loc:"Châtelet–Les Halles · 1st arr.", addr:"4 Rue des Innocents, 75001",
+  lat:48.86055,lng:2.34700, score:4.3, price:"C$450–530", eur:"≈ €280–330", unit:"studio + cot", upgrade:"1-bed from ≈ C$610",
+  cit:true, ac:true, quiet:false, band:true, badges:["Family pick","In-unit laundry"],
+  sub:{Family:4.2,Location:5.0,Transit:5.0,Safety:3.4,Facilities:4.3,Reviews:4.3,Value:3.9},
+  fam:"Cot on request; roomy 1-beds and in-unit washers in many units — gold with a toddler. Jardin Nelson-Mandela playground 2 min. Flat stroller terrain, but heavy crowds; ask for an upper courtyard-side room for naps.",
+  transit:"Châtelet–Les Halles at 3 min — M1·4·7·11·14 + RER A·B·D; direct RER B to CDG.",
+  safety:"Ultra-central and busy; a known pickpocket zone, and the Châtelet nightlife area gets edgy late.",
+  fac:"Renovated 2024–25 (4★): A/C, gym, dishwashers, smart TVs.",
+  src:"Booking 8.7/10 · Tripadvisor 4/5 (1,534) · Trip.com 9/10",
+  pros:["Everything walkable — short outings fit neatly between naps","Freshly renovated apartments with washer-dryers in many units","Free 24 h hot drinks and water in the lobby"],
+  cons:["RER rumble below plus lively street noise can disturb light-sleeping little ones","Housekeeping weekly unless you pay extra","Crowded pavements to weave a stroller through"]},
+
+ {n:"Citadines Opéra Paris", type:"Citadines Apart'hotel · Ascott", loc:"Grands Boulevards · 2nd arr.", addr:"18 Rue Favart, 75002",
+  lat:48.87140,lng:2.33800, score:4.2, price:"C$400–480", eur:"≈ €250–300", unit:"studio + cot", upgrade:"1-bed from ≈ C$560",
+  cit:true, ac:true, quiet:true, band:true, badges:["Quiet street"],
+  sub:{Family:4.0,Location:4.6,Transit:4.5,Safety:4.3,Facilities:3.9,Reviews:4.25,Value:3.8},
+  fam:"Quiet side street — reliably nap-friendly. Washer in some units plus a laundry room; spacious apartments take a cot easily; Tuileries playgrounds ~12 min walk.",
+  transit:"Richelieu–Drouot (M8·9) 1 min; Quatre-Septembre (M3) 4 min; Auber RER A ≈ 8 min.",
+  safety:"Well-lit, busy Grands Boulevards; guests consistently report feeling safe at night.",
+  fac:"Renovated 2015 and kept up: A/C, dishwashers, Nespresso machines, small gym.",
+  src:"Booking 8.5/10 · Tripadvisor 4/5 (341) · Trip.com 8.8/10",
+  pros:["Calm street for baby sleep, yet steps from Opéra and the covered passages","Apartments noticeably larger than typical central hotel rooms","Warm, frequently praised front-desk team"],
+  cons:["Housekeeping only every few days unless paid","Occasional hot-water and shower-pressure complaints","Top-floor rooms have sloped ceilings; rates run high"]},
+
+ {n:"Citadines Saint-Germain-des-Prés Paris", type:"Citadines Apart'hotel · Ascott", loc:"Latin Quarter / Seine · 6th arr.", addr:"53 ter Quai des Grands Augustins, 75006",
+  lat:48.85470,lng:2.34210, score:4.3, price:"C$480–610", eur:"≈ €300–380", unit:"studio + cot", upgrade:"1-bed from ≈ C$690",
+  cit:true, ac:true, quiet:false, band:true, badges:["Family pick","2026 refurb planned"],
+  sub:{Family:4.2,Location:5.0,Transit:4.6,Safety:4.5,Facilities:3.3,Reviews:4.05,Value:3.3},
+  fam:"A family favourite in reviews — big apartments, free guest laundry, babysitting on request; Luxembourg playgrounds 15 min. Ask for a courtyard-side room: the quai carries traffic noise.",
+  transit:"Saint-Michel (M4 + RER B·C) 3–4 min — direct RER B to CDG; Odéon (M4·10) 7 min.",
+  safety:"Prime Left-Bank riverfront: touristy, lively and among the most comfortable areas at night.",
+  fac:"Interiors dated — full renovation announced for 2026. A/C, gym, Seine-view rooms.",
+  src:"Booking 8.1/10 (location 9.6) · Tripadvisor 4/5 (2,600+)",
+  flag:"Renovation announced for 2026 — confirm whether works are underway for your dates.",
+  pros:["The best address of the eighteen — Seine-front, everything on foot with the stroller","Big, genuinely family-shaped apartments; free basement laundry","Some rooms with river views or balconies"],
+  cons:["Tired furnishings and maintenance niggles until the refurb lands","Weakest value-for-money rating of the group (Booking 7.6)","Quai-side rooms hear traffic — courtyard side is the fix"]},
+
+ {n:"Citadines Tour Eiffel Paris", type:"Citadines Apart'hotel · Ascott", loc:"Grenelle · 15th arr.", addr:"132 Boulevard de Grenelle, 75015",
+  lat:48.84960,lng:2.29870, score:4.2, price:"C$420–520", eur:"≈ €260–320", unit:"studio + cot", upgrade:"1-bed from ≈ C$580",
+  cit:true, ac:true, quiet:false, band:true, badges:["Playgrounds nearby"],
+  sub:{Family:4.1,Location:4.2,Transit:4.6,Safety:4.4,Facilities:4.0,Reviews:4.0,Value:3.7},
+  fam:"Champ-de-Mars playgrounds and carousel ~10 min with the stroller; Monoprix opposite for nappies and baby food; street market twice a week. Ask courtyard-side — the elevated métro outside can cut naps short.",
+  transit:"La Motte-Picquet–Grenelle (M6·8·10) directly outside the door.",
+  safety:"Safe, residential, everyday 15th; usual tourist-scam caution right at the Tower.",
+  fac:"Renovated ≈2018: A/C, dishwashers, on-site parking, Eiffel-view rooms on upper floors.",
+  src:"Booking 7.9/10 (location 9.2) · Tripadvisor 4/5 (509) · Trip.com 8.3/10",
+  pros:["Eiffel Tower and its lawns a 12–15 min stroll — perfect toddler outings","Métro, supermarket and market at the doorstep","Real-neighborhood feel with bakeries all around"],
+  cons:["Elevated métro noise on Bd de Grenelle — light sleepers beware","No daily housekeeping (≈C$50 to add per service)","Wear showing in some rooms; breakfast is basic"]},
+
+ {n:"Citadines Trocadéro Paris", type:"Citadines Apart'hotel · Ascott", loc:"Trocadéro / Victor Hugo · 16th arr.", addr:"29 bis Rue Saint-Didier, 75116",
+  lat:48.86690,lng:2.28480, score:4.1, price:"C$390–480", eur:"≈ €240–300", unit:"studio + cot", upgrade:"1-bed from ≈ C$530",
+  cit:true, ac:true, quiet:true, band:true, badges:["Quietest area"],
+  sub:{Family:3.9,Location:4.1,Transit:4.1,Safety:4.7,Facilities:3.8,Reviews:4.05,Value:3.7},
+  fam:"The quietest nights of the Citadines — nap heaven. Garden courtyard, guest washing machine, babysitting referrals; Trocadéro gardens 8 min. Rooms are snug: book a 1-bed so the cot fits comfortably.",
+  transit:"Boissière (M6) 4 min; Trocadéro (M6·9) 6–7 min; Victor Hugo (M2) close by.",
+  safety:"Upscale, quiet 16th — the safest-feeling address on the map, day or night.",
+  fac:"Refurbished; A/C, dishwashers, courtyard garden, on-site parking (tight garage).",
+  src:"Booking 8.2/10 (location 9.3) · Tripadvisor ≈3.5–4/5 (444)",
+  pros:["Calm, elegant quarter between the Eiffel viewpoint and the Arc de Triomphe","Air-conditioned and clean, with a garden to let a toddler roam","Consistently well-reviewed, helpful staff"],
+  cons:["Smallest rooms and narrowest beds — tight with a cot in a studio","Sleepy at night — fewer easy dinner options","Some units and bathrooms feel worn"]},
+
+ {n:"Citadines Montmartre Paris", type:"Citadines Apart'hotel · Ascott", loc:"Montmartre / Pl. de Clichy · 18th arr.", addr:"16 Avenue Rachel, 75018",
+  lat:48.88680,lng:2.33050, score:3.7, price:"C$290–390", eur:"≈ €180–240", unit:"studio + cot", upgrade:"1-bed from ≈ C$420",
+  cit:true, ac:false, quiet:true, band:false, badges:["No A/C"],
+  sub:{Family:2.9,Location:4.0,Transit:4.0,Safety:3.5,Facilities:3.4,Reviews:4.1,Value:4.3},
+  fam:"Two toddler problems: no A/C (fans only) in what can still be a hot early September, and Montmartre's hills and staircases fight the stroller at every turn. The cul-de-sac itself is calm and the rooftop terrace is lovely.",
+  transit:"Blanche (M2) 3 min; Place de Clichy (M2·13) 5 min.",
+  safety:"The dead-end street is calm, but its entrance is the Pigalle strip — rowdy after dark.",
+  fac:"No air-conditioning. Rooftop terrace with Sacré-Cœur and Eiffel views; dishwashers; parking ≈C$48/day.",
+  src:"Booking 8.3/10 (1,656) · Tripadvisor ≈3.5/5 (791)",
+  pros:["Quiet cul-de-sac beside Montmartre cemetery — good value for the space","Rooftop terrace with Sacré-Cœur and Eiffel views","Village Montmartre and its carousel on foot"],
+  cons:["No A/C — the deal-breaker for toddler sleep in early-September heat","Stairs and steep streets everywhere — hard work with a stroller","Pigalle / Bd de Clichy at the corner is loud and seedy at night"]},
+
+ {n:"Citadines Bastille Marais Paris", type:"Citadines Apart'hotel · Ascott", loc:"Bastille / Marais edge · 11th arr.", addr:"37 Boulevard Richard-Lenoir, 75011",
+  lat:48.85800,lng:2.36980, score:4.0, price:"C$350–430", eur:"≈ €220–270", unit:"studio + cot", upgrade:"1-bed from ≈ C$480",
+  cit:true, ac:true, quiet:true, band:true, badges:["Roomy apartments"],
+  sub:{Family:4.0,Location:4.3,Transit:4.2,Safety:4.1,Facilities:3.4,Reviews:4.0,Value:3.9},
+  fam:"Genuinely roomy apartments with separate bedrooms; courtyard-side rooms are nap-quiet. Playgrounds dot the Richard-Lenoir promenade outside, and the twice-weekly market is ideal for fresh baby food.",
+  transit:"Bréguet–Sabin (M5) 2 min; Bastille (M1·5·8) 8 min on foot.",
+  safety:"Pleasant residential boulevard; standard big-city awareness around Bastille's nightlife.",
+  fac:"A/C throughout, some balconies/terraces, parking — but interiors are aging and due a refresh.",
+  src:"Booking 8.0/10 (2,701) · Tripadvisor 4/5 (1,206)",
+  pros:["Flat, stroller-easy walk to the Marais and Place des Vosges playground","Open-air market on the doorstep Thursday and Sunday mornings","Separate-bedroom layouts — put the toddler down and stay up"],
+  cons:["Bathrooms and kitchens showing their age","Towel changes and extra housekeeping can be slow to arrange","Central A/C struggles in heatwaves"]},
+
+ {n:"Citadines République Paris", type:"Citadines Apart'hotel · Ascott", loc:"Oberkampf / République · 11th arr.", addr:"75 bis Avenue Parmentier, 75011",
+  lat:48.86560,lng:2.37470, score:3.9, price:"C$310–390", eur:"≈ €190–240", unit:"studio + cot", upgrade:"1-bed from ≈ C$430",
+  cit:true, ac:true, quiet:true, band:false, badges:["Newly renovated"],
+  sub:{Family:3.7,Location:3.6,Transit:4.2,Safety:3.8,Facilities:4.0,Reviews:3.9,Value:4.1},
+  fam:"Newly renovated with A/C at family-friendly prices; courtyard rooms are quiet. Canal St-Martin stroller loops are close, though big playground-parks are thinner here than elsewhere.",
+  transit:"Parmentier (M3) 2 min; Oberkampf (M5·9) 7 min; République hub ~10 min.",
+  safety:"Lively local nightlife on Oberkampf; fine overall with some scruffy pockets toward République.",
+  fac:"Newly renovated (2024–25): A/C, terrace, private parking, refreshed rooms.",
+  src:"Booking 8.0/10 (2,099) · Tripadvisor ≈3–3.5/5 (451)",
+  pros:["Fresh post-renovation rooms at fair prices","Genuine neighborhood Paris — markets, bakeries, Canal St-Martin","Quick métro runs to the Marais and the center"],
+  cons:["20–30 min from the headline sights — more transit with the stroller","Overbooking / relocation incidents appear in recent reviews","Weekly housekeeping standard"]},
+
+ {n:"Citadines Bastille Gare de Lyon Paris", type:"Citadines Apart'hotel · Ascott", loc:"Reuilly / Gare de Lyon · 12th arr.", addr:"14–18 Rue de Chaligny, 75012",
+  lat:48.84740,lng:2.38720, score:3.6, price:"C$290–370", eur:"≈ €180–230", unit:"studio + cot", upgrade:"1-bed from ≈ C$400",
+  cit:true, ac:false, quiet:false, band:false, badges:["Works all 2026"],
+  sub:{Family:2.8,Location:3.4,Transit:4.4,Safety:4.0,Facilities:2.9,Reviews:3.9,Value:3.9},
+  fam:"Hard to recommend with a baby in 2026: the top-to-bottom renovation runs all year and daytime works noise is a nap-killer, while un-renovated rooms lack A/C. Post-works (A/C added) it should suit families well.",
+  transit:"Reuilly–Diderot (M1·8) 2–4 min — M1 direct to the Louvre; Gare de Lyon (TGV, RER A·D) 12 min walk.",
+  safety:"Quiet, everyday residential 12th; unremarkable and generally comfortable.",
+  fac:"Historically the most dated (no A/C). Full renovation 5 Jan – 5 Dec 2026, adding A/C; renovated rooms appearing in stages.",
+  src:"Booking 7.9/10 (2,489) · Tripadvisor ≈3.5/5 (615)",
+  flag:"Under phased renovation for all of 2026 — daytime noise likely during a September stay; if booking, insist on a finished room.",
+  pros:["Cheap for the transit on offer — M1 plus TGV/airport links via Gare de Lyon","Quiet streets, balconies on deluxe units, Marché d'Aligre nearby","Post-renovation rooms should be a clear step up"],
+  cons:["Renovation disruption all of 2026 — noise and odors reported","Un-renovated units are very tired, with no A/C","Few sights or big playgrounds within an easy walk"]},
+
+ {n:"Citadines Place d'Italie Paris", type:"Citadines Apart'hotel · Ascott", loc:"Place d'Italie · 13th arr.", addr:"18 Place d'Italie, 75013",
+  lat:48.83210,lng:2.35520, score:4.0, price:"C$260–340", eur:"≈ €160–210", unit:"studio + cot", upgrade:"1-bed from ≈ C$370",
+  cit:true, ac:true, quiet:false, band:false, badges:["Best value"],
+  sub:{Family:4.0,Location:3.4,Transit:4.6,Safety:3.7,Facilities:3.8,Reviews:4.15,Value:4.3},
+  fam:"Carrefour downstairs for nappies, formula and baby food; reliable A/C and a guest laundry; parc de Choisy playground ~8 min. Métro staircases are awkward with a stroller — the bus hub outside is the easier option.",
+  transit:"Place d'Italie (M5·6·7) literally at the door, plus a major bus hub; easy Orly access.",
+  safety:"Fine by day; pickpockets work the métro and mall, and it feels rough-ish to some late at night.",
+  fac:"A/C, dishwashers, guest laundry; attached to the Italie Deux mall; parking below; lifts are slow.",
+  src:"Booking 8.1/10 (2,587) · Trip.com 8.7/10 · Tripadvisor 4/5 (628)",
+  pros:["Supermarket and mall next door — baby logistics solved","Three métro lines at the doorstep; the best value on the map","Village-like Butte-aux-Cailles for easy family dinners 5 min away"],
+  cons:["Away from the postcard sights — everything is a métro or bus ride","Watch belongings around the station and mall","Slow, limited elevators; occasional hot-water blips"]},
+
+ {n:"Citadines Austerlitz Paris", type:"Citadines Apart'hotel · Ascott", loc:"Gare d'Austerlitz / Campo-Formio · 13th arr.", addr:"27 Rue Esquirol, 75013",
+  lat:48.83630,lng:2.36050, score:3.7, price:"C$240–320", eur:"≈ €150–200", unit:"studio + cot", upgrade:"Apt from ≈ C$350",
+  cit:true, ac:false, quiet:true, band:false, badges:["No A/C","Zoo 10 min"],
+  sub:{Family:3.4,Location:3.2,Transit:3.9,Safety:4.0,Facilities:3.1,Reviews:3.95,Value:4.2},
+  fam:"Jardin des Plantes and its ménagerie (small zoo) 10 flat minutes away — toddler gold — and the street is genuinely quiet. But there's no A/C (fans only) and bathrooms are dated; best as a shoulder-season budget pick.",
+  transit:"Campo-Formio (M5) 3 min; Gare d'Austerlitz (M5·10, RER C) 10 min on foot.",
+  safety:"Quiet, safe-feeling side street; the area simply goes to sleep after dark.",
+  fac:"No A/C (fans provided); dated bathrooms; garden terrace, guest laundry, parking. Small 50-unit house.",
+  src:"Booking 8.1/10 (1,925) · Tripadvisor ≈3/5 (220)",
+  pros:["Cheapest on the map — unusually large rooms for the price","Jardin des Plantes, zoo and greenhouses in an easy stroller loop","Small and personable, with a garden courtyard"],
+  cons:["No A/C and clearly dated interiors","Dull, quiet surroundings in the evening","Soundproofing and bathroom-ventilation complaints"]},
+
+ {n:"Citadines Montparnasse Paris", type:"Citadines Apart'hotel · Ascott", loc:"Montparnasse / Gaîté · 14th arr.", addr:"67 Avenue du Maine, 75014",
+  lat:48.83850,lng:2.32250, score:4.0, price:"C$310–390", eur:"≈ €190–240", unit:"studio + cot", upgrade:"1-bed from ≈ C$430",
+  cit:true, ac:true, quiet:false, band:false, badges:["TGV & Orly links"],
+  sub:{Family:3.8,Location:3.7,Transit:4.7,Safety:4.0,Facilities:3.7,Reviews:4.1,Value:4.1},
+  fam:"The easiest arrival day of the Citadines — 6 min to Montparnasse TGV and direct Orly links, with a lift and level streets. Renovated, A/C, patio courtyard; studios are tight for three, so take a 1-bed. Kitchens run lightly equipped.",
+  transit:"Gaîté (M13) 50 m away; Montparnasse–Bienvenüe (M4·6·12·13 + TGV) 6 min; direct Orly links.",
+  safety:"Busy, ordinary station district — fine with standard awareness, quiet on the side streets.",
+  fac:"Fully renovated; A/C, patio courtyard, small paid parking.",
+  src:"Aggregate 8.3/10 (2,430) · Tripadvisor 4/5",
+  pros:["Four métro lines and the TGV within 6 min — painless with baby gear","Renovated, spotless rooms with well-rated beds","Luxembourg Gardens' famous playground ~20 min stroll"],
+  cons:["Studios compact and kitchenettes minimally stocked — book the 1-bed","Street-facing rooms pick up traffic noise","The area is functional rather than charming"]},
+
+ /* ---------- OTHER STAYS IN THE C$380–550 BAND (6) ---------- */
+ {n:"Aparthotel Adagio Paris Centre Tour Eiffel", type:"Aparthotel — Adagio · Accor", loc:"Beaugrenelle / Front de Seine · 15th arr.", addr:"14 Rue du Théâtre, 75015",
+  lat:48.84970,lng:2.28480, score:3.9, price:"C$400–520", eur:"≈ €250–320", unit:"studio + cot", upgrade:"1-bed from ≈ C$580",
+  cit:false, ac:true, quiet:false, band:true, badges:["Indoor pool","Lift queues"],
+  sub:{Family:4.1,Location:4.0,Transit:3.9,Safety:4.1,Facilities:3.5,Reviews:3.85,Value:4.0},
+  fam:"The pool-and-kitchen combo in a 32-floor tower: small indoor pool, on-site playground, kids' breakfast options and full kitchens with dishwashers; Beaugrenelle mall and Monoprix next door. Chronic lift queues are a pain with a stroller — allow extra time.",
+  transit:"Charles Michels (M10) and Dupleix (M6) ~5–8 min; useful buses at the door; Eiffel Tower a 15-min walk.",
+  safety:"Quiet, modern Front-de-Seine quarter; the esplanade approach attracts some loitering but is fine overall.",
+  fac:"375-unit 4★ tower: A/C, indoor pool, gym, parking; corridors and some units dated, elevators unreliable.",
+  src:"Booking 8.0/10 (2,482) · Tripadvisor 3/5 (3,011) · Trip.com 8.4/10",
+  pros:["Indoor pool + on-site playground — rare in Paris at this price","Big apartments, many with knockout Eiffel or skyline views","Mall, supermarket and bakeries at the doorstep"],
+  cons:["Elevator breakdowns and long waits come up constantly in reviews","Housekeeping and fresh towels cost extra on short stays","Maintenance and service consistency are hit-and-miss"]},
+
+ {n:"Novotel Paris Les Halles", type:"Hotel — Novotel · Accor", loc:"Châtelet–Les Halles · 1st arr.", addr:"8 Place Marguerite de Navarre, 75001",
+  lat:48.86070,lng:2.34610, score:4.2, price:"C$520–640", eur:"≈ €330–400", unit:"double + sofa bed + cot", upgrade:"Family suite on request",
+  cit:false, ac:true, quiet:false, band:false, badges:["Playground & kids' menu","Often above band"],
+  sub:{Family:4.2,Location:5.0,Transit:5.0,Safety:3.4,Facilities:3.9,Reviews:4.05,Value:3.3},
+  fam:"The classic full-service family hotel: garden with playground, arcade/games room, kids' menu at the restaurant, cots and family/connecting rooms — with daily housekeeping, which no aparthotel here offers. No kitchen, and September rates often overshoot the C$550 line.",
+  transit:"Châtelet–Les Halles at the door — M1·4·7·11·14 + RER A·B·D; direct RER B to CDG.",
+  safety:"Ultra-central and busy; a known pickpocket zone, and the Châtelet nightlife area gets edgy late.",
+  fac:"285-room 4★, rolling refurbishment through 2026: A/C, garden, playground, restaurant; renovated floors nice, older ones tired.",
+  src:"Booking 8.1/10 (3,930) · Tripadvisor 4/5 (7,444)",
+  flag:"Rolling refurbishment in 2026 — scaffolding and a busy breakfast room reported; ask for a renovated, works-free floor.",
+  pros:["Daily housekeeping and a real playground — the low-effort option with a toddler","Unbeatable transit and walkability, same block as Citadines Les Halles","Kids' meals, arcade room and family suites"],
+  cons:["No kitchen — every toddler meal is a restaurant meal","Typically the priciest stay on this map in September","Renovation-period noise and breakfast crowding in recent reviews"]},
+
+ {n:"Novotel Paris Gare de Lyon", type:"Hotel — Novotel · Accor", loc:"Gare de Lyon / Daumesnil · 12th arr.", addr:"2 Rue Hector Malot, 75012",
+  lat:48.84560,lng:2.37350, score:4.1, price:"C$430–550", eur:"≈ €270–340", unit:"double + sofa bed + cot", upgrade:"Family/connecting from ≈ C$580",
+  cit:false, ac:true, quiet:false, band:true, badges:["Pool + kids zone"],
+  sub:{Family:4.5,Location:3.5,Transit:4.7,Safety:3.8,Facilities:4.0,Reviews:4.05,Value:3.9},
+  fam:"The strongest pure family package in the band: heated indoor pool with long hours, a kids' games zone, kids-focused breakfast, clean cots, connecting rooms and daily housekeeping. Direct RER A to Disneyland from next door. No kitchen; the station square outside is gritty.",
+  transit:"Gare de Lyon adjacent — M1·14 + RER A·D + TGV; Reuilly-Diderot (M8) close; direct RER A to Disneyland.",
+  safety:"Fine inside and on the side streets; the station forecourt has typical big-terminus grit (rough sleepers reported).",
+  fac:"Modern 4★: heated pool, gym, renovated restaurant/lobby, parking ≈C$56/day; pool is small and occasionally closed for maintenance.",
+  src:"Booking 8.1/10 (3,042) · Tripadvisor 4/5 (3,904)",
+  pros:["Heated pool + kids zone — the toddler-pleaser of the whole map","TGV, two métro lines and Disneyland RER on the doorstep","Daily housekeeping, cots and connecting rooms without aparthotel DIY"],
+  cons:["No kitchen for baby meals — fridge and kettle only","Station-square surroundings lack charm and can feel scruffy","Pool is narrow and books up; occasional maintenance closures"]},
+
+ {n:"Résidence Nell", type:"Aparthotel — independent", loc:"Faubourg-Montmartre · 9th arr.", addr:"60 Rue Richer, 75009",
+  lat:48.87430,lng:2.34480, score:4.2, price:"C$450–560", eur:"≈ €280–350", unit:"studio + cot", upgrade:"1-bed apt from ≈ C$640",
+  cit:false, ac:true, quiet:true, band:true, badges:["Top rated","Cot + bottle warmer"],
+  sub:{Family:4.4,Location:4.0,Transit:4.0,Safety:4.0,Facilities:4.4,Reviews:4.4,Value:4.0},
+  fam:"A 17-apartment boutique house that quietly solves the toddler problems: cots and a bottle warmer on hand, kitchenettes with dishwasher, DAILY cleaning (dishes included — unique here), excellent soundproofing, and room-service from local restaurants after bedtime. Square Montholon playground ~6 min.",
+  transit:"Le Peletier (M7) ~5 min; Grands Boulevards (M8·9) 6 min; Cadet (M7) close.",
+  safety:"Lively foodie street (rue Richer / Faubourg-Montmartre) — busy evenings, fine with standard awareness.",
+  fac:"Fully renovated 2020 (Patrick Jouin design): A/C, kitchenettes, daily housekeeping, 24 h concierge; Michelin Guide-listed.",
+  src:"Expedia 9.0/10 (534) · Booking ≈8.4/10 · Tripadvisor 4/5 Travelers' Choice (389)",
+  pros:["The best-reviewed stay on this map — spacious, immaculate, genuinely quiet","Daily cleaning plus a kitchen: hotel ease with aparthotel practicality","Cot, bottle warmer and in-room breakfast make baby mornings easy"],
+  cons:["Only 17 units — books out early for September","Bar street outside is lively on weekend nights (soundproofing holds up)","No gym, garden or lounge — apartments are the whole show"]},
+
+ {n:"Aparthotel Adagio Paris Montmartre", type:"Aparthotel — Adagio · Accor", loc:"Abbesses / Anvers · 18th arr.", addr:"10 Place Charles Dullin, 75018",
+  lat:48.88370,lng:2.34380, score:3.8, price:"C$370–470", eur:"≈ €230–290", unit:"studio + cot", upgrade:"1-bed from ≈ C$520",
+  cit:false, ac:false, quiet:true, band:true, badges:["No A/C"],
+  sub:{Family:3.2,Location:4.2,Transit:4.1,Safety:3.6,Facilities:3.4,Reviews:4.05,Value:4.0},
+  fam:"On a calm, leafy square at the foot of Sacré-Cœur with the Square d'Anvers playground 2 min away, kitchens, an interior garden and free breakfast for under-16s — but no A/C at all (official), steps at the entrance, and Montmartre's slopes all around. A charming shoulder-season pick, risky for toddler sleep in early September.",
+  transit:"Anvers (M2) 3 min; Abbesses (M12) 6 min; the Montmartre funicular is a toddler hit.",
+  safety:"The square itself is calm; the approach lane is scruffy (rough sleeper reported) and Anvers draws heavy tourist flow.",
+  fac:"76-unit 4★ residence: kitchens, interior garden, parking; no A/C, no daily cleaning, occasional lift and hot-water hiccups.",
+  src:"Booking 8.3/10 (2,789) · Tripadvisor 3/5 (771) · location subscore 9.4",
+  pros:["Quiet leafy square with a playground 2 minutes away","Kids under 16 eat breakfast free; kitchens for everything else","Sacré-Cœur, the carousel and the funicular on foot"],
+  cons:["No air-conditioning anywhere in the building","Steps at the entrance and hills everywhere — stroller hard mode","Grubby approach lane and no daily housekeeping"]},
+
+ {n:"Les Jardins du Marais", type:"Hotel — independent", loc:"Marais edge / Saint-Ambroise · 11th arr.", addr:"74 Rue Amelot, 75011",
+  lat:48.86070,lng:2.36790, score:4.1, price:"C$420–530", eur:"≈ €260–330", unit:"double + cot", upgrade:"Junior suite from ≈ C$610",
+  cit:false, ac:true, quiet:true, band:true, badges:["Garden courtyard"],
+  sub:{Family:4.1,Location:4.4,Transit:4.1,Safety:4.1,Facilities:3.5,Reviews:4.05,Value:3.7},
+  fam:"263 rooms in seven low wings around a huge private garden courtyard — a safe, traffic-free run-around zone that toddlers love. Kitchenette-style rooms (fridge + microwave), kids under 12 stay free on existing beds, daily housekeeping, and the Marais on foot. Rooms and beds run small; book a larger category.",
+  transit:"Saint-Sébastien–Froissart (M8) one block; Bréguet-Sabin (M5) and Bastille (M1·5·8) ~8–10 min.",
+  safety:"Pleasant, residential Marais edge; comfortable at night with normal city awareness.",
+  fac:"4★ with garden, sauna/fitness, parking on request; A/C works but glitches in heat, décor dated in places, occasional lift outages.",
+  src:"Booking 8.7/10 (4,742) · Tripadvisor 3/5 (3,366) · Trip.com 8.6/10",
+  pros:["The garden courtyard — a private, enclosed toddler playground in central Paris","Kids under 12 free + fridge/microwave in rooms + daily housekeeping","Quiet despite being a 10-min flat walk from Place des Vosges"],
+  cons:["Standard rooms and beds are small — tight with a cot","Dated corners, A/C and elevator hiccups show up in reviews","Service can be stretched when tour groups are in"]}
+];
+
+function tierHex(s){ return s>=4.25?"#067647":(s>=4.05?"#55A66A":(s>=3.85?"#D9A036":"#D95841")); }
+
+var map = L.map('map',{scrollWheelZoom:true, zoomControl:true});
+map.attributionControl.setPrefix(false);
+var carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  subdomains:'abcd', maxZoom:19, attribution:'&copy; OpenStreetMap contributors &copy; CARTO'});
+var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  maxZoom:19, attribution:'&copy; OpenStreetMap contributors'});
+var switched=false;
+carto.on('tileerror',function(){ if(!switched){switched=true; map.removeLayer(carto); osm.addTo(map);} });
+carto.addTo(map);
+
+function dotHTML(h){
+  var c=tierHex(h.score);
+  if(h.cit){ return '<span class="tdot" style="background:'+c+'"></span>'; }
+  return '<span class="tdot" style="background:#fff;border:2.5px solid '+c+'"></span>';
+}
+function meters(sub){
+  var order=["Family","Location","Transit","Safety","Facilities","Reviews","Value"];
+  return order.map(function(k){
+    var v=sub[k], w=Math.round(v/5*100);
+    return '<div class="meter"><span class="lab">'+k+'</span>'+
+      '<span class="bar"><i style="width:'+w+'%"></i></span><b>'+v.toFixed(1)+'</b></div>';
+  }).join('');
+}
+function list(items,cls,sym){
+  return items.map(function(t){return '<li class="'+cls+'"><span>'+sym+'</span><span>'+t+'</span></li>';}).join('');
+}
+function badges(h){
+  var out=h.badges.map(function(b){
+    var warn=(b.indexOf('No A/C')>-1||b.indexOf('Works')>-1||b.indexOf('refurb')>-1||b.indexOf('above band')>-1||b.indexOf('Lift')>-1);
+    return '<span class="badge'+(warn?' warn':'')+'">'+b+'</span>';
+  });
+  return '<div class="badges">'+out.join('')+'</div>';
+}
+function popupHTML(h){
+  var g='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(h.n+', '+h.addr+' Paris');
+  return '<div class="card">'+
+    '<div class="card-head">'+
+      '<div class="brand">'+h.type+'</div>'+
+      '<h3>'+h.n.replace(' Paris','')+'</h3>'+
+      '<div class="rate">★ <b>'+h.score.toFixed(1)+'</b> family score <span class="srcs">· '+h.src+'</span></div>'+
+      '<div class="loc">'+h.loc+' — '+h.addr+'</div>'+
+      badges(h)+
+    '</div>'+
+    '<div class="price-row"><b>'+h.price+'</b> <span>night</span>'+
+      '<small>'+h.unit+' · '+h.eur+' · Sept 2026 approx. — '+h.upgrade+'</small></div>'+
+    (h.flag?('<div class="flag">⚠ '+h.flag+'</div>'):'')+
+    '<div class="card-body">'+
+      '<div class="sec"><div class="sec-t">Scores / 5</div>'+meters(h.sub)+'</div>'+
+      '<div class="sec"><div class="sec-t">With a 2-year-old</div>'+
+        '<div class="facts"><div class="f"><span>👶</span><span>'+h.fam+'</span></div></div></div>'+
+      '<div class="sec"><div class="sec-t">The essentials</div><div class="facts">'+
+        '<div class="f"><span>🚇</span><span>'+h.transit+'</span></div>'+
+        '<div class="f"><span>🛡️</span><span>'+h.safety+'</span></div>'+
+        '<div class="f"><span>🛠️</span><span>'+h.fac+'</span></div>'+
+      '</div></div>'+
+      '<div class="sec pc"><div class="sec-t">What guests repeat — pros</div><ul>'+list(h.pros,'p','✓')+'</ul></div>'+
+      '<div class="sec pc"><div class="sec-t">What guests repeat — cons</div><ul>'+list(h.cons,'c','✕')+'</ul></div>'+
+      '<div class="sec"><div class="src">Guest-review sources: '+h.src+'</div></div>'+
+    '</div>'+
+    '<div class="card-foot"><a href="'+g+'" target="_blank" rel="noopener">Open in Google Maps</a></div>'+
+  '</div>';
+}
+
+var markers=[];
+HOTELS.forEach(function(h){
+  var icon=L.divIcon({className:'',
+    html:'<div class="pill">'+dotHTML(h)+'<span>★ '+h.score.toFixed(1)+'</span></div>',
+    iconSize:[66,30], iconAnchor:[33,15], popupAnchor:[0,-16]});
+  var m=L.marker([h.lat,h.lng],{icon:icon, title:h.n, alt:h.n, riseOnHover:true});
+  m.bindTooltip(h.n.replace(' Paris',''),{direction:'top',offset:[0,-15],opacity:0.95});
+  m.bindPopup(popupHTML(h),{maxWidth:308, minWidth:296, autoPanPadding:[26,26], closeButton:true});
+  m.on('popupopen',function(){ var el=m.getElement(); if(el){var p=el.querySelector('.pill'); if(p)p.classList.add('sel');} });
+  m.on('popupclose',function(){ var el=m.getElement(); if(el){var p=el.querySelector('.pill'); if(p)p.classList.remove('sel');} });
+  m.addTo(map);
+  markers.push({h:h,m:m});
+});
+map.fitBounds(HOTELS.map(function(h){return [h.lat,h.lng];}),{padding:[40,40]});
+
+var F={ac:false,quiet:false,band:false,top:false,cit:false};
+function pass(h){
+  return (!F.ac||h.ac)&&(!F.quiet||h.quiet)&&(!F.band||h.band)&&(!F.top||h.score>=4.0)&&(!F.cit||h.cit);
+}
+function apply(){
+  var n=0;
+  markers.forEach(function(o){
+    if(pass(o.h)){ if(!map.hasLayer(o.m)) o.m.addTo(map); n++; }
+    else { o.m.closePopup(); if(map.hasLayer(o.m)) map.removeLayer(o.m); }
+  });
+  document.getElementById('countpill').textContent =
+    n===0 ? 'No stays match — clear a filter' : n+' of 18 stays';
+  var any=F.ac||F.quiet||F.band||F.top||F.cit;
+  document.getElementById('f-clear').classList.toggle('show',any);
+}
+function hook(id,key){
+  var b=document.getElementById(id);
+  b.addEventListener('click',function(){
+    F[key]=!F[key];
+    b.setAttribute('aria-pressed',F[key]?'true':'false');
+    apply();
+  });
+}
+hook('f-ac','ac'); hook('f-quiet','quiet'); hook('f-band','band'); hook('f-top','top'); hook('f-cit','cit');
+document.getElementById('f-clear').addEventListener('click',function(){
+  F={ac:false,quiet:false,band:false,top:false,cit:false};
+  ['f-ac','f-quiet','f-band','f-top','f-cit'].forEach(function(id){
+    document.getElementById(id).setAttribute('aria-pressed','false');
+  });
+  apply();
+});
+apply();
+</script>
+</body>
+</html>
