@@ -668,7 +668,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 </style>
 <style>
 :root{
-  --accent:#FF385C; --video:#008388; --both:#7b3ff2; --ink:#222222; --muted:#717171;
+  --accent:#FF385C; --video:#008388; --rick:#2f6fd6; --both:#7b3ff2; --ink:#222222; --muted:#717171;
   --card:#ffffff; --line:#ebebeb; --shadow:0 6px 20px rgba(0,0,0,.14);
   --radius:16px;
 }
@@ -731,7 +731,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 
 /* legend */
 .legend{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)}
-.legend .sw{display:inline-block;width:12px;height:12px;border-radius:50%;background:#fff;border:2.5px solid;margin-right:8px;vertical-align:-2px}
+.legend .sw{display:inline-block;width:12px;height:12px;border-radius:50%;border:2.5px solid transparent;
+  background:linear-gradient(#fff,#fff) padding-box, var(--ring,conic-gradient(var(--accent) 0 100%)) border-box;
+  margin-right:8px;vertical-align:-2px}
 
 /* FAB (mobile) */
 .fab{display:none;position:fixed;right:16px;bottom:20px;z-index:1001;background:var(--ink);color:#fff;border:0;
@@ -739,12 +741,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 .fab .n{background:var(--accent);border-radius:999px;padding:1px 8px;font-size:12px;margin-left:6px}
 
 /* ---------- pins ---------- */
-.pin{width:34px;height:34px;border-radius:50% 50% 50% 4px;background:#fff;display:flex;align-items:center;justify-content:center;
-  font-size:15px;border:2.5px solid var(--accent);box-shadow:0 3px 8px rgba(0,0,0,.25);cursor:pointer;
+.pin{width:34px;height:34px;border-radius:50% 50% 50% 4px;display:flex;align-items:center;justify-content:center;
+  font-size:15px;border:2.5px solid transparent;box-shadow:0 3px 8px rgba(0,0,0,.25);cursor:pointer;
+  background:linear-gradient(#fff,#fff) padding-box, var(--ring,conic-gradient(var(--accent) 0 100%)) border-box;
   transition:transform .12s}
 .pin:hover{transform:scale(1.15)}
-.pin.src-Video{border-color:var(--video)}
-.pin.src-Both{border-color:var(--both)}
 
 /* ---------- popup ---------- */
 .leaflet-popup-content-wrapper{border-radius:14px;box-shadow:var(--shadow);padding:0}
@@ -754,7 +755,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 .pp .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}
 .chip{font-size:11px;padding:3px 9px;border-radius:999px;background:#f2f2f2;color:#444}
 .chip.src{color:#fff}
-.chip.src-Plan{background:var(--accent)} .chip.src-Video{background:var(--video)} .chip.src-Both{background:var(--both)}
+.chip.src-plan{background:var(--accent)} .chip.src-alan{background:var(--video)} .chip.src-rick{background:var(--rick)}
 .chip.oly{background:#fff4d6;color:#8a6100}
 .pp h5{margin:10px 0 4px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 .pp .txt{font-size:12.8px;line-height:1.5;color:#333}
@@ -825,9 +826,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
     <div class="section">
       <h3>Legend</h3>
       <div class="legend">
-        <span><span class="sw" style="border-color:var(--accent)"></span>Trip plan</span>
-        <span><span class="sw" style="border-color:var(--video)"></span>Video recommendation</span>
-        <span><span class="sw" style="border-color:var(--both)"></span>In both</span>
+        <span><span class="sw" style="--ring:conic-gradient(var(--accent) 0 100%)"></span>Trip plan</span>
+        <span><span class="sw" style="--ring:conic-gradient(var(--video) 0 100%)"></span>Alan x el mundo</span>
+        <span><span class="sw" style="--ring:conic-gradient(var(--rick) 0 100%)"></span>Rick Steves</span>
+        <span><span class="sw" style="--ring:conic-gradient(from -45deg,var(--accent) 0 33%,var(--video) 33% 66%,var(--rick) 66% 100%)"></span>Split ring = multiple sources</span>
       </div>
     </div>
   </div>
@@ -859,6 +861,17 @@ bases.voyager.addTo(map);
 /* ---------- markers ---------- */
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function parts(s){return s.split(' | ').map(esc);}
+function recs(p){
+  const r = [];
+  if (p.source==='Plan' || p.source==='Both') r.push({k:'plan', c:'var(--accent)', t:'Trip plan'});
+  if (/Alan/.test(p.video))        r.push({k:'alan', c:'var(--video)', t:"Alan x el mundo"});
+  if (/Rick Steves/.test(p.video)) r.push({k:'rick', c:'var(--rick)',  t:'Rick Steves'});
+  return r;
+}
+function ring(p){
+  const r = recs(p), seg = 100/r.length;
+  return `conic-gradient(from -45deg,${r.map((x,i)=>`${x.c} ${i*seg}% ${(i+1)*seg}%`).join(',')})`;
+}
 function popupHtml(p){
   const act = parts(p.activity), rev = parts(p.review);
   const actHtml = act.length>1 ? '<ul><li>'+act.join('</li><li>')+'</li></ul>' : act[0];
@@ -867,7 +880,7 @@ function popupHtml(p){
   return `<div class="pp">
     <h4>${icon(p.category)} ${esc(p.name)}</h4>
     <div class="chips"><span class="chip">${esc(p.category)}</span>
-      <span class="chip src src-${p.source}">${p.source==='Both'?'Video + plan':p.source==='Video'?'Video pick':'Trip plan'}</span>${oly}</div>
+      ${recs(p).map(x=>`<span class="chip src src-${x.k}">${x.t}</span>`).join('')}${oly}</div>
     <h5>Activity</h5><div class="txt">${actHtml}</div>
     <h5>Notes & review</h5><div class="txt rev">${revHtml}</div>
     <button class="more" style="display:none">Show more</button>
@@ -876,7 +889,7 @@ function popupHtml(p){
 }
 const markers = PLACES.map(p => {
   const m = L.marker([p.lat, p.lon], {
-    icon: L.divIcon({className:'', html:`<div class="pin src-${p.source}">${icon(p.category)}</div>`,
+    icon: L.divIcon({className:'', html:`<div class="pin" style="--ring:${ring(p)}">${icon(p.category)}</div>`,
                      iconSize:[34,34], iconAnchor:[17,32], popupAnchor:[0,-30]}),
     title: p.name
   }).bindPopup(popupHtml(p), {maxWidth:320});
